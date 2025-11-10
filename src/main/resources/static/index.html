@@ -81,13 +81,13 @@
 
 <script>
     // =========================
-    // AJUSTA ESTA CONSTANTE:
-    // '' = mismo host que el frontend (ej: pruebas locales).
-    // O p.ej. 'http://69.62.91.103:8080' si usas tu VPS/Tomcat.
-    const API_BASE = 'http://69.62.91.103:8080/practica1    ';
+    // CONFIGURACIÓN API - CORREGIDO (sin espacios extra)
+    // =========================
+    const API_BASE = 'http://69.62.91.103:8080/practica1';
 
     // =========================
-    // LOGIN (sin token). El backend devuelve "Login exitoso" si ok.
+    // LOGIN
+    // =========================
     document.getElementById('btnLogin').addEventListener('click', async () => {
       const login = document.getElementById('loginUser').value.trim();
       const pass = document.getElementById('loginPass').value;
@@ -105,9 +105,8 @@
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ login, password: pass })
         });
-        const text = await res.text(); // tu controlador devuelve "Login exitoso" o "Login fallido"
+        const text = await res.text();
         if (res.ok && text && text.toLowerCase().includes('exitos')) {
-          // acceso permitido
           localStorage.setItem('practica1_user', login);
           showApp();
           await loadAll();
@@ -134,14 +133,14 @@
       document.getElementById('app').classList.add('d-none');
     }
 
-    // Si ya está logueado (localStorage), mostrar
     if (localStorage.getItem('practica1_user')) {
       showApp();
       loadAll();
     }
 
     // =========================
-    // CLIENTES CRUD (tu entidad: codiClie, nombClie)
+    // CLIENTES CRUD
+    // =========================
     const clientesList = document.getElementById('clientesList');
 
     document.getElementById('clienteForm').addEventListener('submit', async (ev) => {
@@ -189,7 +188,8 @@
     };
 
     // =========================
-    // PRODUCTOS CRUD (codiProd, nombProd, precProd, stocProd, version)
+    // PRODUCTOS CRUD
+    // =========================
     document.getElementById('productoForm').addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const dto = {
@@ -201,21 +201,18 @@
 
       try {
         if (dto.codiProd) {
-          // PUT
           await fetch(API_BASE + '/api/productos/' + dto.codiProd, {
             method: 'PUT',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify(dto)
           });
         } else {
-          // POST
           await fetch(API_BASE + '/api/productos', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify(dto)
           });
         }
-        // limpiar form
         document.getElementById('codiProd').value = '';
         document.getElementById('nombProd').value = '';
         document.getElementById('precProd').value = '';
@@ -272,7 +269,6 @@
       await loadProductos();
     };
 
-    // Actualizar stock con control de versión (usa endpoint PUT /api/productos/{id}/stock)
     async function askUpdateStock(id, currentVersion, currentStock) {
       const nuevo = prompt(`Stock actual: ${currentStock}\nIngresa nuevo stock:`);
       if (nuevo === null) return;
@@ -299,7 +295,8 @@
     }
 
     // =========================
-    // Cargar todo
+    // CARGAR TODO
+    // =========================
     async function loadAll(){
       await loadClientes();
       await loadProductos();
