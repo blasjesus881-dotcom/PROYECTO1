@@ -14,7 +14,6 @@ public class UsuarioService {
 
     public boolean login(String login, String password) {
         try {
-            // Validación de parámetros
             if (login == null || login.trim().isEmpty()) {
                 System.out.println("Login vacío o nulo");
                 return false;
@@ -28,24 +27,35 @@ public class UsuarioService {
 
             Optional<Usuario> usuarioOpt = usuarioRepository.findByLogin(login);
 
-            if (usuarioOpt.isPresent()) {
-                Usuario usuario = usuarioOpt.get();
-                System.out.println("Usuario encontrado en BD: " + usuario.getLogin());
-
-                // Comparación simple - En producción usar BCrypt
-                boolean passwordMatch = usuario.getPassword().equals(password);
-                System.out.println("Contraseña coincide: " + passwordMatch);
-
-                return passwordMatch;
-            } else {
+            if (usuarioOpt.isEmpty()) {
                 System.out.println("Usuario no encontrado en BD: " + login);
+                return false;
             }
 
-            return false;
+            Usuario usuario = usuarioOpt.get();
+            System.out.println("Usuario encontrado en BD: " + usuario.getLogin());
+
+            String stored = usuario.getPassword(); // puede ser null
+            if (stored == null) {
+                System.out.println("Password en BD es null para usuario: " + login);
+                return false;
+            }
+
+            // si en BD guardaste algo como "{noop}miPass", lo eliminamos antes de comparar
+            if (stored.startsWith("{noop}")) {
+                stored = stored.substring("{noop}".length());
+            }
+
+            // Compara de forma segura (llama equals sobre el parámetro recibido para evitar NPE)
+            boolean passwordMatch = password.equals(stored);
+            System.out.println("Contraseña coincide: " + passwordMatch);
+
+            return passwordMatch;
         } catch (Exception e) {
             System.err.println("Error en login: " + e.getMessage());
             e.printStackTrace();
-            throw new RuntimeException("Error al realizar login", e);
+            // NO lanzamos RuntimeException aquí, devolvemos false o podrías devolver status 500 en controller
+            return false;
         }
     }
 }
