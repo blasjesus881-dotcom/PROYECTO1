@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Práctica1 - Front</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <h1 class="mb-3">Práctica1 — Interfaz</h1>
+
+    <!-- LOGIN -->
+    <div id="loginCard" class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Inicio de sesión</h5>
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <input id="loginUser" class="form-control" placeholder="usuario (ej: admin)" />
+                </div>
+                <div class="col-md-4">
+                    <input id="loginPass" type="password" class="form-control" placeholder="contraseña" />
+                </div>
+                <div class="col-md-4">
+                    <button id="btnLogin" class="btn btn-primary">Entrar</button>
+                </div>
+            </div>
+            <small id="loginMsg" class="text-danger mt-2 d-block"></small>
+        </div>
+    </div>
+
+    <!-- APP -->
+    <div id="app" class="d-none">
+
+        <div class="mb-3 d-flex justify-content-between align-items-center">
+            <h4>Panel</h4>
+            <div>
+                <button id="btnLogout" class="btn btn-outline-secondary">Cerrar sesión</button>
+            </div>
+        </div>
+
+        <!-- CLIENTES -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Clientes</h5>
+                <form id="clienteForm" class="row g-2 align-items-center mb-3">
+                    <div class="col-md-4">
+                        <input id="nombClie" class="form-control" placeholder="Nombre cliente" required />
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-success" type="submit">Agregar</button>
+                    </div>
+                </form>
+                <ul id="clientesList" class="list-group"></ul>
+            </div>
+        </div>
+
+        <!-- PRODUCTOS -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Productos</h5>
+                <form id="productoForm" class="row g-2 align-items-center mb-3">
+                    <div class="col-md-2"><input id="codiProd" class="form-control" placeholder="Código (int) - opcional" /></div>
+                    <div class="col-md-3"><input id="nombProd" class="form-control" placeholder="Nombre" /></div>
+                    <div class="col-md-2"><input id="precProd" type="number" step="0.01" class="form-control" placeholder="Precio" /></div>
+                    <div class="col-md-2"><input id="stocProd" type="number" step="1" class="form-control" placeholder="Stock" /></div>
+                    <div class="col-md-3"><button class="btn btn-primary" type="submit">Crear / Actualizar</button></div>
+                </form>
+
+                <table class="table table-sm">
+                    <thead>
+                    <tr><th>Código</th><th>Nombre</th><th>Precio</th><th>Stock</th><th>Versión</th><th>Acciones</th></tr>
+                    </thead>
+                    <tbody id="productosBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // =========================
+    // AJUSTA ESTA CONSTANTE:
+    // '' = mismo host que el frontend (ej: pruebas locales).
+    // O p.ej. 'http://69.62.91.103:8080' si usas tu VPS/Tomcat.
+    const API_BASE = 'http://69.62.91.103:8080/practica1    ';
+
+    // =========================
+    // LOGIN (sin token). El backend devuelve "Login exitoso" si ok.
+    document.getElementById('btnLogin').addEventListener('click', async () => {
+      const login = document.getElementById('loginUser').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      const msg = document.getElementById('loginMsg');
+      msg.textContent = '';
+
+      if (!login || !pass) {
+        msg.textContent = 'Completa usuario y contraseña';
+        return;
+      }
+
+      try {
+        const res = await fetch(API_BASE + '/api/usuario/login', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ login, password: pass })
+        });
+        const text = await res.text(); // tu controlador devuelve "Login exitoso" o "Login fallido"
+        if (res.ok && text && text.toLowerCase().includes('exitos')) {
+          // acceso permitido
+          localStorage.setItem('practica1_user', login);
+          showApp();
+          await loadAll();
+        } else {
+          msg.textContent = 'Credenciales inválidas';
+        }
+      } catch (err) {
+        msg.textContent = 'Error al conectar al servidor';
+        console.error(err);
+      }
+    });
+
+    document.getElementById('btnLogout').addEventListener('click', () => {
+      localStorage.removeItem('practica1_user');
+      hideApp();
+    });
+
+    function showApp(){
+      document.getElementById('loginCard').classList.add('d-none');
+      document.getElementById('app').classList.remove('d-none');
+    }
+    function hideApp(){
+      document.getElementById('loginCard').classList.remove('d-none');
+      document.getElementById('app').classList.add('d-none');
+    }
+
+    // Si ya está logueado (localStorage), mostrar
+    if (localStorage.getItem('practica1_user')) {
+      showApp();
+      loadAll();
+    }
+
+    // =========================
+    // CLIENTES CRUD (tu entidad: codiClie, nombClie)
+    const clientesList = document.getElementById('clientesList');
+
+    document.getElementById('clienteForm').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const nombClie = document.getElementById('nombClie').value.trim();
+      if (!nombClie) return;
+      try {
+        await fetch(API_BASE + '/api/clientes', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ nombClie })
+        });
+        document.getElementById('nombClie').value = '';
+        await loadClientes();
+      } catch (e) {
+        alert('Error al guardar cliente');
+        console.error(e);
+      }
+    });
+
+    async function loadClientes(){
+      clientesList.innerHTML = '';
+      try {
+        const res = await fetch(API_BASE + '/api/clientes');
+        if (!res.ok) return;
+        const arr = await res.json();
+        arr.forEach(c => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item d-flex justify-content-between align-items-center';
+          li.innerHTML = `<div>${c.nombClie} <small class="text-muted">#${c.codiClie}</small></div>
+            <div>
+              <button class="btn btn-sm btn-danger" onclick="delCliente(${c.codiClie})">Eliminar</button>
+            </div>`;
+          clientesList.appendChild(li);
+        });
+      } catch (e) {
+        console.error('Cargar clientes:', e);
+      }
+    }
+
+    window.delCliente = async (id) => {
+      if (!confirm('Eliminar cliente #' + id + '?')) return;
+      await fetch(API_BASE + '/api/clientes/' + id, { method: 'DELETE' });
+      await loadClientes();
+    };
+
+    // =========================
+    // PRODUCTOS CRUD (codiProd, nombProd, precProd, stocProd, version)
+    document.getElementById('productoForm').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const dto = {
+        codiProd: parseInt(document.getElementById('codiProd').value) || null,
+        nombProd: document.getElementById('nombProd').value,
+        precProd: parseFloat(document.getElementById('precProd').value) || 0,
+        stocProd: parseFloat(document.getElementById('stocProd').value) || 0
+      };
+
+      try {
+        if (dto.codiProd) {
+          // PUT
+          await fetch(API_BASE + '/api/productos/' + dto.codiProd, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(dto)
+          });
+        } else {
+          // POST
+          await fetch(API_BASE + '/api/productos', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(dto)
+          });
+        }
+        // limpiar form
+        document.getElementById('codiProd').value = '';
+        document.getElementById('nombProd').value = '';
+        document.getElementById('precProd').value = '';
+        document.getElementById('stocProd').value = '';
+        await loadProductos();
+      } catch (e) {
+        alert('Error en producto');
+        console.error(e);
+      }
+    });
+
+    async function loadProductos(){
+      const tbody = document.getElementById('productosBody');
+      tbody.innerHTML = '';
+      try {
+        const res = await fetch(API_BASE + '/api/productos');
+        if (!res.ok) return;
+        const list = await res.json();
+        list.forEach(p => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${p.codiProd ?? ''}</td>
+            <td>${p.nombProd ?? ''}</td>
+            <td>${p.precProd ?? ''}</td>
+            <td>${p.stocProd ?? ''}</td>
+            <td>${p.version ?? ''}</td>
+            <td>
+              <button class="btn btn-sm btn-info" onclick="editProducto(${p.codiProd})">Editar</button>
+              <button class="btn btn-sm btn-danger" onclick="delProducto(${p.codiProd})">Eliminar</button>
+              <button class="btn btn-sm btn-warning" onclick="askUpdateStock(${p.codiProd}, ${p.version ?? 0}, ${p.stocProd ?? 0})">Actualizar stock</button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error('Cargar productos:', e);
+      }
+    }
+
+    window.editProducto = async (id) => {
+      try {
+        const res = await fetch(API_BASE + '/api/productos/' + id);
+        if (!res.ok) return;
+        const p = await res.json();
+        document.getElementById('codiProd').value = p.codiProd;
+        document.getElementById('nombProd').value = p.nombProd;
+        document.getElementById('precProd').value = p.precProd;
+        document.getElementById('stocProd').value = p.stocProd;
+      } catch (e) { console.error(e); }
+    };
+
+    window.delProducto = async (id) => {
+      if (!confirm('Eliminar producto #' + id + '?')) return;
+      await fetch(API_BASE + '/api/productos/' + id, { method: 'DELETE' });
+      await loadProductos();
+    };
+
+    // Actualizar stock con control de versión (usa endpoint PUT /api/productos/{id}/stock)
+    async function askUpdateStock(id, currentVersion, currentStock) {
+      const nuevo = prompt(`Stock actual: ${currentStock}\nIngresa nuevo stock:`);
+      if (nuevo === null) return;
+      const st = parseFloat(nuevo);
+      if (isNaN(st)) { alert('Stock inválido'); return; }
+      try {
+        const res = await fetch(API_BASE + '/api/productos/' + id + '/stock', {
+          method: 'PUT',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ stocProd: st, version: currentVersion })
+        });
+        if (res.status === 409) {
+          const txt = await res.text();
+          alert('Conflicto: ' + txt);
+        } else if (!res.ok) {
+          alert('Error actualizando stock');
+        } else {
+          await loadProductos();
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Error al actualizar stock');
+      }
+    }
+
+    // =========================
+    // Cargar todo
+    async function loadAll(){
+      await loadClientes();
+      await loadProductos();
+    }
+</script>
+</body>
+</html>
